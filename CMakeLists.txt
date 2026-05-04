@@ -12,7 +12,7 @@ add_subdirectory(lib/Fonts)
 add_subdirectory(lib/GUI)
 add_subdirectory(examples)
 
-include_directories(examples)
+include_directories(./src)
 include_directories(./lib/Config)
 include_directories(./lib/GUI)
 include_directories(./lib/Icm20948)
@@ -23,6 +23,7 @@ include_directories(./lib/Fonts)
 
 add_executable(main
     main.c
+    src/app.c
 )
 
 pico_enable_stdio_usb(main 1)
@@ -30,4 +31,4 @@ pico_enable_stdio_uart(main 1)
 
 pico_add_extra_outputs(main)
 
-target_link_libraries(main examples LCD OLED Infrared Icm20948 GUI Fonts Config pico_stdlib hardware_spi)
+target_link_libraries(main LCD OLED Infrared Icm20948 GUI Fonts Config pico_stdlib hardware_spi)

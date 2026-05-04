@@ -1,6 +1,6 @@
-#include "LCD_Test.h"
+#include "app.h"
 
 int main(void) {
-    LCD_1in3_test();
+    app_run();
     return 0;
 }
