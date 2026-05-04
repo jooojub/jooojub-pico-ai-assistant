@@ -1,0 +1,41 @@
+# Build output
+build/
+
+# oh-my-claudecode
+.omc/
+
+# Pico mount point
+RPI-RP2/
+
+# Vim swap files
+*.swp
+*.swo
+
+# Precompiled headers
+*.gch
+
+# Object files
+*.o
+*.a
+
+# Compiled binaries
+*.elf
+*.bin
+*.hex
+*.uf2
+*.map
+
+# CMake generated
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile.cmake
+
+# IDE / editor
+.vscode/
+.idea/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
