@@ -6,9 +6,7 @@ MOUNT_PATH = $(CURDIR)/RPI-RP2
 
 .PHONY: all clean flash
 
-all: $(BUILD_DIR)/main.uf2
-
-$(BUILD_DIR)/main.uf2: $(BUILD_DIR)/Makefile
+all: $(BUILD_DIR)/Makefile
 	$(MAKE) -C $(BUILD_DIR) --no-print-directory
 
 $(BUILD_DIR)/Makefile: CMakeLists.txt
