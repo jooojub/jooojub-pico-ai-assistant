@@ -4,6 +4,8 @@
 #include "GUI_Paint.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include "pico/stdlib.h"
 
 /*
  * Face proportions ported from StackChan (320x240) to our 240x240 LCD.
@@ -69,8 +71,13 @@
 typedef enum { STATE_IDLE, STATE_TALKING, STATE_LOVE, STATE_HAPPY } AppState;
 
 static UWORD *g_img;
-static const char *g_talk_text  = "Hello world";
-static const char *g_happy_text = "Hello! I am your AI assistant. Nice to meet you today!";
+static char g_talk_text[256]  = "Hello world";
+static char g_happy_text[256] = "Hello! I am your AI assistant. Nice to meet you today!";
+
+/* Serial command state — shared between parser and main loop */
+typedef enum { CMD_NONE, CMD_TALK, CMD_LOVE, CMD_HAPPY, CMD_IDLE } PendingCmd;
+static volatile PendingCmd g_pending_cmd = CMD_NONE;
+static char g_pending_arg[256] = {0};
 
 /* ------------------------------------------------------------------ */
 /* Integer sqrt (Babylonian)                                           */
@@ -303,6 +310,43 @@ static void redraw_happy(int scroll_off) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Serial command parser (non-blocking, called every loop iteration)  */
+/* Protocol: "<CMD> [arg]\n"                                          */
+/*   TALK <text>   – talk animation with custom text                  */
+/*   LOVE          – shy/love animation                               */
+/*   HAPPY <text>  – happy animation with scrolling text              */
+/*   IDLE          – return to idle                                   */
+/* ------------------------------------------------------------------ */
+static void poll_serial(void) {
+    static char buf[258];
+    static int  len = 0;
+
+    int c;
+    while ((c = getchar_timeout_us(0)) != PICO_ERROR_TIMEOUT) {
+        if (c == '\n' || c == '\r') {
+            if (len == 0) continue;
+            buf[len] = '\0';
+            len = 0;
+
+            if (strncmp(buf, "TALK ", 5) == 0) {
+                strncpy(g_pending_arg, buf + 5, sizeof(g_pending_arg) - 1);
+                g_pending_cmd = CMD_TALK;
+            } else if (strcmp(buf, "LOVE") == 0) {
+                g_pending_cmd = CMD_LOVE;
+            } else if (strncmp(buf, "HAPPY ", 6) == 0) {
+                strncpy(g_pending_arg, buf + 6, sizeof(g_pending_arg) - 1);
+                g_pending_cmd = CMD_HAPPY;
+            } else if (strcmp(buf, "IDLE") == 0) {
+                g_pending_cmd = CMD_IDLE;
+            }
+            printf("OK\n");
+        } else if (len < (int)(sizeof(buf) - 2)) {
+            buf[len++] = (char)c;
+        }
+    }
+}
+
+/* ------------------------------------------------------------------ */
 /* app_run                                                             */
 /* ------------------------------------------------------------------ */
 void app_run(void) {
@@ -325,6 +369,7 @@ void app_run(void) {
     draw_eyes_open();
     draw_mouth_closed();
     LCD_1IN3_Display(g_img);
+    printf("READY\n");
 
     AppState state       = STATE_IDLE;
     int idle_ms          = 0;
@@ -428,6 +473,36 @@ void app_run(void) {
                 redraw_idle(1);
             } else {
                 redraw_happy(happy_scroll_off);
+            }
+        }
+
+        /* Process any pending serial command */
+        poll_serial();
+        if (g_pending_cmd != CMD_NONE) {
+            PendingCmd cmd = g_pending_cmd;
+            g_pending_cmd = CMD_NONE;
+
+            if (cmd == CMD_TALK) {
+                strncpy(g_talk_text, g_pending_arg, sizeof(g_talk_text) - 1);
+                state = STATE_TALKING;
+                talk_phase_ms = 0; talk_open = 1; talk_count = 0; scroll_off = 0;
+                blinking = idle_ms = 0;
+                redraw_talk(1, 0);
+            } else if (cmd == CMD_LOVE) {
+                state = STATE_LOVE;
+                love_phase_ms = 0; love_hearts_on = 1; love_blink_count = 0;
+                blinking = idle_ms = 0;
+                redraw_love(1);
+            } else if (cmd == CMD_HAPPY) {
+                strncpy(g_happy_text, g_pending_arg, sizeof(g_happy_text) - 1);
+                state = STATE_HAPPY;
+                happy_ms = 0; happy_scroll_off = 0;
+                blinking = idle_ms = 0;
+                redraw_happy(0);
+            } else if (cmd == CMD_IDLE) {
+                state = STATE_IDLE;
+                blinking = idle_ms = 0;
+                redraw_idle(1);
             }
         }
 

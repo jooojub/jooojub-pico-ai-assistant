@@ -1,0 +1,16 @@
+services:
+  pico-service:
+    build: .
+    ports:
+      - "8000:8000"
+    devices:
+      # USB serial port of the Pico (Linux: /dev/ttyACM0, Mac: /dev/tty.usbmodem*)
+      - "${PICO_PORT:-/dev/ttyACM0}:/dev/ttyACM0"
+    volumes:
+      # Read-only /proc mount so psutil can report host CPU/memory usage
+      - /proc:/host/proc:ro
+    environment:
+      - PICO_SERIAL_PORT=/dev/ttyACM0
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+    restart: unless-stopped
