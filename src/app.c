@@ -14,7 +14,7 @@
 /* Buttons */
 #define BTN_A   15   /* KEY_A  — talking      */
 #define BTN_B   17   /* KEY_B  — shy / love   */
-#define BTN_C    3   /* Joystick center — happy (adjust GPIO if needed) */
+#define BTN_X   19   /* KEY_X  — happy / scroll */
 
 /* Eyes: StackChan offset (±70, -16) scaled × 0.75 */
 #define EYE_LEFT_X      68
@@ -63,13 +63,14 @@
 #define TALK_PHASE_MS        120
 #define LOVE_BLINK_MS        400
 #define LOVE_BLINKS            3
-#define HAPPY_DURATION_MS   3000
+#define HAPPY_DURATION_MS   8000
 #define LOOP_DELAY_MS         16
 
 typedef enum { STATE_IDLE, STATE_TALKING, STATE_LOVE, STATE_HAPPY } AppState;
 
 static UWORD *g_img;
-static const char *g_talk_text = "Hello world";
+static const char *g_talk_text  = "Hello world";
+static const char *g_happy_text = "Hello! I am your AI assistant. Nice to meet you today!";
 
 /* ------------------------------------------------------------------ */
 /* Integer sqrt (Babylonian)                                           */
@@ -274,10 +275,30 @@ static void redraw_love(int heart_on) {
     LCD_1IN3_Display(g_img);
 }
 
-static void redraw_happy(void) {
+static void redraw_happy(int scroll_off) {
     Paint_Clear(BLACK);
     draw_eyes_happy();
     draw_mouth_closed();
+
+    draw_speech_bubble();
+
+    int text_x1 = BUBBLE_X1 + BUBBLE_R + 4;
+    int text_x2 = BUBBLE_X2 - BUBBLE_R - 4;
+    int ty  = BUBBLE_Y1 + ((BUBBLE_Y2 - BUBBLE_Y1) - Font16.Height) / 2;
+    int tx  = text_x1 - scroll_off;
+    const char *ptr = g_happy_text;
+    while (tx < text_x1 && *ptr) { tx += Font16.Width; ptr++; }
+    if (*ptr && tx < text_x2) {
+        int vis = (text_x2 - tx) / (int)Font16.Width + 1;
+        int slen = (int)strlen(ptr);
+        if (vis > slen) vis = slen;
+        char buf[64];
+        if (vis > 63) vis = 63;
+        memcpy(buf, ptr, (size_t)vis);
+        buf[vis] = '\0';
+        Paint_DrawString_EN((UWORD)tx, (UWORD)ty, buf, &Font16, BLACK, WHITE);
+    }
+
     LCD_1IN3_Display(g_img);
 }
 
@@ -299,7 +320,7 @@ void app_run(void) {
 
     DEV_KEY_Config(BTN_A);
     DEV_KEY_Config(BTN_B);
-    DEV_KEY_Config(BTN_C);
+    DEV_KEY_Config(BTN_X);
 
     draw_eyes_open();
     draw_mouth_closed();
@@ -317,6 +338,7 @@ void app_run(void) {
     int love_hearts_on   = 1;
     int love_blink_count = 0;
     int happy_ms         = 0;
+    int happy_scroll_off = 0;
 
     while (1) {
         if (state == STATE_IDLE) {
@@ -334,11 +356,11 @@ void app_run(void) {
                 blinking = idle_ms = 0;
                 redraw_love(1);
 
-            } else if (DEV_Digital_Read(BTN_C) == 0) {
+            } else if (DEV_Digital_Read(BTN_X) == 0) {
                 state = STATE_HAPPY;
-                happy_ms = 0;
+                happy_ms = 0; happy_scroll_off = 0;
                 blinking = idle_ms = 0;
-                redraw_happy();
+                redraw_happy(0);
 
             } else if (!blinking) {
                 idle_ms += LOOP_DELAY_MS;
@@ -393,9 +415,19 @@ void app_run(void) {
         } else { /* STATE_HAPPY */
 
             happy_ms += LOOP_DELAY_MS;
+
+            int h_text_w = (int)strlen(g_happy_text) * (int)Font16.Width;
+            int h_vis_w  = BUBBLE_X2 - BUBBLE_X1 - 10;
+            if (h_text_w > h_vis_w) {
+                happy_scroll_off += 4;
+                if (happy_scroll_off > h_text_w) happy_scroll_off = 0;
+            }
             if (happy_ms >= HAPPY_DURATION_MS) {
                 state = STATE_IDLE;
+                happy_scroll_off = 0;
                 redraw_idle(1);
+            } else {
+                redraw_happy(happy_scroll_off);
             }
         }
 
